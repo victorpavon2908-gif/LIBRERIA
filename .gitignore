@@ -1,0 +1,30 @@
+# Gradle
+.gradle/
+build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Local configuration (contains SDK path / machine specific data)
+local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and build reports created locally
+*.log
+build*.txt
+*-out.txt
+*-err.txt
+out.txt
+err.txt
+d.txt
+t.txt
+gradle-pid.txt

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher icon background: brand purple of the "MYC Librería" identity. -->
+    <color name="ic_launcher_background">#7B3FF2</color>
+    <!-- Window background of the dark app shell, same as ui/theme/Theme.kt Bg. -->
+    <color name="app_background">#080B19</color>
+</resources>

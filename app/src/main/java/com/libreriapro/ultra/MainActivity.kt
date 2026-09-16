@@ -3,124 +3,380 @@ package com.libreriapro.ultra
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-private val BG = Color(0xFF080B19)
-private val CARD = Color(0xFF11172A)
-private val PURPLE = Color(0xFF7B3FF2)
-private val BLUE = Color(0xFF14B8FF)
-private val GREEN = Color(0xFF27D17F)
-private val RED = Color(0xFFFF5267)
-private val SOFT = Color(0xFFAAB3CB)
-
-data class Product(val id: Int, val name: String, val barcode: String, val stock: Int, val min: Int, val buy: Double, val sell: Double)
-data class Line(val p: Product, val qty: Int)
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.libreriapro.ultra.ui.AddTarget
+import com.libreriapro.ultra.domain.Dates
+import com.libreriapro.ultra.domain.Sale
+import com.libreriapro.ultra.ui.Fmt
+import com.libreriapro.ultra.ui.LibreriaViewModel
+import com.libreriapro.ultra.ui.MainDestinations
+import com.libreriapro.ultra.ui.Routes
+import com.libreriapro.ultra.ui.ScanTarget
+import com.libreriapro.ultra.ui.ScanTarget.SALE
+import com.libreriapro.ultra.ui.UiState
+import com.libreriapro.ultra.ui.components.LocalCompactLayout
+import com.libreriapro.ultra.ui.components.KeyValueRow
+import com.libreriapro.ultra.ui.scanner.BarcodeScannerDialog
+import com.libreriapro.ultra.ui.screens.CashScreen
+import com.libreriapro.ultra.ui.screens.CheckoutScreen
+import com.libreriapro.ultra.ui.screens.HomeScreen
+import com.libreriapro.ultra.ui.screens.InventoryScreen
+import com.libreriapro.ultra.ui.screens.KardexScreen
+import com.libreriapro.ultra.ui.screens.MoreScreen
+import com.libreriapro.ultra.ui.screens.PurchaseScreen
+import com.libreriapro.ultra.ui.screens.ReportsScreen
+import com.libreriapro.ultra.ui.screens.SalesScreen
+import com.libreriapro.ultra.ui.screens.SettingsScreen
+import com.libreriapro.ultra.ui.theme.Bg
+import com.libreriapro.ultra.ui.theme.Green
+import com.libreriapro.ultra.ui.theme.LibreriaTheme
+import com.libreriapro.ultra.ui.theme.NavBg
+import com.libreriapro.ultra.ui.theme.Soft
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(b: Bundle?) { super.onCreate(b); setContent { App() } }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            LibreriaTheme {
+                LibreriaApp()
+            }
+        }
+    }
 }
 
+/**
+ * Application shell: responsive scaffold (bottom bar on phones, navigation rail on
+ * tablets), the barcode scanner dialog and the snackbar with the result of every
+ * operation.
+ */
 @Composable
-fun App() {
-    var page by remember { mutableStateOf("Inicio") }
-    var ps by remember { mutableStateOf(listOf(
-        Product(1, "Cuaderno universitario", "7501234567893", 32, 5, 38.0, 55.0),
-        Product(2, "Lápiz HB", "7509873214567", 120, 20, 4.0, 12.0),
-        Product(3, "Colores 12 uds", "7504567891234", 8, 10, 42.0, 75.0),
-        Product(4, "Borrador blanco", "7501112223334", 45, 10, 3.0, 8.0),
-        Product(5, "Regla 30 cm", "7503334445556", 18, 5, 10.0, 18.0),
-        Product(6, "Papel bond carta", "7509998887776", 15, 5, 95.0, 125.0)
-    )) }
-    var cart by remember { mutableStateOf(listOf<Line>()) }
-    var scanner by remember { mutableStateOf(false) }
+fun LibreriaApp(viewModel: LibreriaViewModel = viewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val navController = rememberNavController()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
 
-    MaterialTheme(colorScheme = darkColorScheme(background = BG, surface = CARD, primary = PURPLE, onSurface = Color.White)) {
-        Scaffold(containerColor = BG, topBar = { Top() }, bottomBar = { Nav(page) { page = it } }) { pad ->
-            Box(Modifier.padding(pad).fillMaxSize()) {
-                when (page) {
-                    "Inicio" -> Home(ps) { page = it }
-                    "Inventario" -> Inventory(ps) { scanner = true }
-                    "Ventas" -> Sales(ps, cart, { product -> cart = cart.addLine(product) }) { page = "Cobro" }
-                    "Compras" -> Purchase { scanner = true }
-                    "Reportes" -> Simple("Reportes", listOf("Ingresos   C$ 24,850", "Ventas   184", "Compras   C$ 9,420", "Stock bajo   ${ps.count { it.stock <= it.min }}"), "📊")
-                    "Cobro" -> Checkout(cart) {
-                        ps = ps.map { product ->
-                            val qty = cart.firstOrNull { it.p.id == product.id }?.qty ?: 0
-                            if (qty > 0) product.copy(stock = (product.stock - qty).coerceAtLeast(0)) else product
-                        }
-                        cart = emptyList(); page = "Ventas"
-                    }
-                    "Caja" -> Simple("Caja", listOf("Apertura de caja", "Ventas del día C$ 8,450", "Entradas C$ 1,200", "Salidas C$ 500", "Cierre"), "💵")
-                    "Kardex" -> Simple("Kardex", listOf("Compra +20 → 40", "Venta -3 → 37", "Venta -5 → 32", "Compra +15 → 47"), "▤")
-                    else -> Simple("Más", listOf("Clientes", "Proveedores", "Usuarios y roles", "Configuración"), "⚙️")
+    LaunchedEffect(state.message) {
+        val message = state.message ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.consumeMessage()
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val compact = maxWidth < 720.dp
+        CompositionLocalProvider(LocalCompactLayout provides compact) {
+            Scaffold(
+                containerColor = Bg,
+                topBar = { LibreriaTopBar(state) },
+                bottomBar = {
+                    if (compact) LibreriaBottomBar(currentRoute, navController)
+                },
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+            ) { padding ->
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                ) {
+                    if (!compact) LibreriaRail(currentRoute, navController)
+                    LibreriaNavHost(
+                        navController = navController,
+                        state = state,
+                        viewModel = viewModel,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }
-        if (scanner) Scanner(ps) { scanner = false }
+    }
+
+    if (state.scanTarget != null) {
+        BarcodeScannerDialog(
+            onDismiss = { viewModel.endScan() },
+            onBarcode = { code -> viewModel.onBarcodeScanned(code) },
+            status = state.scanFeedback,
+            title = when (state.scanTarget) {
+                SALE -> "Escanear para la venta"
+                ScanTarget.PURCHASE -> "Escanear para la compra"
+                ScanTarget.INVENTORY -> "Buscar producto"
+                null -> "Escanear código de barras"
+            },
+        )
+    }
+
+    state.lastTicket?.let { ticket ->
+        ReceiptDialog(
+            ticket = ticket,
+            symbol = state.settings.currencySymbol,
+            onDismiss = { viewModel.consumeTicket() },
+        )
     }
 }
 
-fun List<Line>.addLine(p: Product): List<Line> = map { if (it.p.id == p.id) it.copy(qty = it.qty + 1) else it }.let { updated -> if (updated.none { it.p.id == p.id }) updated + Line(p, 1) else updated }
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LibreriaTopBar(state: UiState) {
+    TopAppBar(
+        title = {
+            Column {
+                Text(
+                    state.settings.businessName,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+                Text(
+                    "LIBRERÍA · ${state.products.size} productos · ${state.lowStock.size} alertas",
+                    fontSize = 10.sp,
+                    color = Soft,
+                    letterSpacing = 1.sp,
+                )
+            }
+        },
+        actions = {
+            Text(
+                Fmt.money(state.todayTotal, state.settings.currencySymbol),
+                fontSize = 13.sp,
+                color = Green,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(end = 16.dp),
+            )
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Bg,
+            titleContentColor = Color.White,
+            actionIconContentColor = Color.White,
+        ),
+    )
+}
 
 @Composable
-fun Top() { Row(Modifier.fillMaxWidth().background(BG).padding(18.dp)) { Text("☰", fontSize = 24.sp); Spacer(Modifier.width(14.dp)); Column(Modifier.weight(1f)) { Text("MYC", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold); Text("LIBRERÍA", fontSize = 9.sp, color = SOFT, letterSpacing = 2.sp) }; Text("⌕  🔔  ●") } }
-
-@Composable
-fun Nav(p: String, g: (String) -> Unit) { NavigationBar(containerColor = Color(0xFF0D1223)) { listOf("Inicio" to "⌂", "Inventario" to "▣", "Ventas" to "🛒", "Reportes" to "▥").forEach { (name, icon) -> NavigationBarItem(selected = p == name, onClick = { g(name) }, icon = { Text(icon) }, label = { Text(name, fontSize = 10.sp) }) } } }
-
-@Composable
-fun Home(p: List<Product>, g: (String) -> Unit) {
-    val low = p.count { it.stock <= it.min }
-    LazyColumn(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { Text("¡Hola, Víctor! 👋", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold); Text("Bienvenido a tu negocio", color = SOFT) }
-        item { Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) { Row(Modifier.background(Brush.linearGradient(listOf(PURPLE, BLUE))).padding(20.dp)) { Column(Modifier.weight(1f)) { Text("Ventas hoy", color = Color.White.copy(alpha = .8f)); Text("C$ 8,450", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold); Text("↑ 12%") }; Text("▥", fontSize = 30.sp) } } }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { Metric("▣", "Productos", p.size.toString(), Modifier.weight(1f)); Metric("⚠", "Stock bajo", low.toString(), Modifier.weight(1f)) } }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { Metric("📦", "Compras", "C$ 3,200", Modifier.weight(1f)); Metric("👥", "Clientes", "48", Modifier.weight(1f)) } }
-        item { Text("Acciones rápidas", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Quick("📷", "Escanear", BLUE) { g("Inventario") }; Quick("🛒", "Venta", PURPLE) { g("Ventas") }; Quick("📦", "Compra", GREEN) { g("Compras") } } }
-        item { Text("Ventas de la semana", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
-        item { Text("▂▅▃▇▆█▇", fontSize = 35.sp, color = PURPLE) }
-        item { Text("⚡ Alertas", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
-        items(p.filter { it.stock <= it.min }) { Alert(it.name, "Solo quedan ${it.stock} unidades") }
+private fun LibreriaBottomBar(currentRoute: String, navController: NavHostController) {
+    NavigationBar(containerColor = NavBg) {
+        MainDestinations.forEach { destination ->
+            NavigationBarItem(
+                selected = currentRoute == destination.route,
+                onClick = { navigateTo(navController, destination.route) },
+                icon = { Icon(destination.icon, contentDescription = destination.label) },
+                label = { Text(destination.label, fontSize = 10.sp) },
+            )
+        }
     }
 }
 
 @Composable
-fun Metric(i: String, t: String, v: String, m: Modifier) { Card(m, shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = CARD)) { Column(Modifier.padding(15.dp)) { Text(i, fontSize = 21.sp); Text(t, color = SOFT, fontSize = 12.sp); Text(v, fontSize = 20.sp, fontWeight = FontWeight.Bold) } } }
+private fun LibreriaRail(currentRoute: String, navController: NavHostController) {
+    NavigationRail(containerColor = NavBg) {
+        Spacer(Modifier.height(14.dp))
+        MainDestinations.forEach { destination ->
+            NavigationRailItem(
+                selected = currentRoute == destination.route,
+                onClick = { navigateTo(navController, destination.route) },
+                icon = { Icon(destination.icon, contentDescription = destination.label) },
+                label = { Text(destination.label, fontSize = 10.sp) },
+            )
+        }
+    }
+}
+
+/** Moves between sections keeping one single entry per destination in the back stack. */
+private fun navigateTo(navController: NavHostController, route: String) {
+    navController.navigate(route) {
+        popUpTo(Routes.HOME) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
+}
 
 @Composable
-fun RowScope.Quick(i: String, t: String, c: Color, on: () -> Unit) { Card(Modifier.weight(1f).clickable { on() }, shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF171E34))) { Column(Modifier.padding(12.dp)) { Text(i, fontSize = 22.sp); Text(t, color = c, fontSize = 11.sp) } } }
+private fun LibreriaNavHost(
+    navController: NavHostController,
+    state: UiState,
+    viewModel: LibreriaViewModel,
+    modifier: Modifier = Modifier,
+) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.HOME,
+        modifier = modifier,
+    ) {
+        composable(Routes.HOME) {
+            HomeScreen(
+                state = state,
+                onNavigate = { route ->
+                    navController.navigate(route) { launchSingleTop = true }
+                },
+                onScan = {
+                    navController.navigate(Routes.SALES) { launchSingleTop = true }
+                    viewModel.beginScan(SALE)
+                },
+            )
+        }
+        composable(Routes.INVENTORY) {
+            InventoryScreen(
+                state = state,
+                onScan = { viewModel.beginScan(ScanTarget.INVENTORY) },
+                onSaveProduct = { product -> viewModel.saveProduct(product) },
+                onDeleteProduct = { product -> viewModel.deleteProduct(product) },
+                onAdjustStock = { product, delta -> viewModel.adjustStock(product, delta) },
+                onClearPendingBarcode = { viewModel.clearPendingBarcode() },
+                onClearPendingProduct = { viewModel.clearPendingProduct() },
+            )
+        }
+        composable(Routes.SALES) {
+            SalesScreen(
+                state = state,
+                onScan = { viewModel.beginScan(SALE) },
+                onNavigate = { route ->
+                    navController.navigate(route) { launchSingleTop = true }
+                },
+                onAdd = { product -> viewModel.addToCart(product) },
+                onIncrease = { productId -> viewModel.incrementCartLine(productId, 1) },
+                onDecrease = { productId -> viewModel.incrementCartLine(productId, -1) },
+                onRemove = { productId -> viewModel.removeFromCart(productId) },
+                onClearCart = { viewModel.clearCart() },
+            )
+        }
+        composable(Routes.CHECKOUT) {
+            CheckoutScreen(
+                state = state,
+                onConfirm = { method ->
+                    viewModel.checkout(method)
+                    navController.navigate(Routes.SALES) { launchSingleTop = true }
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(Routes.PURCHASE) {
+            PurchaseScreen(
+                state = state,
+                onScan = { viewModel.beginScan(ScanTarget.PURCHASE) },
+                onAdd = { product -> viewModel.addToPurchase(product) },
+                onQty = { productId, qty -> viewModel.setPurchaseQty(productId, qty) },
+                onCost = { productId, cost -> viewModel.setPurchaseCost(productId, cost) },
+                onRemove = { productId -> viewModel.removeFromPurchase(productId) },
+                onSupplier = { supplier -> viewModel.setSupplier(supplier) },
+                onConfirm = { viewModel.confirmPurchase() },
+                onCancel = { viewModel.clearPurchase() },
+                onSaveNewProduct = { product -> viewModel.saveProduct(product, AddTarget.PURCHASE) },
+                onClearPendingBarcode = { viewModel.clearPendingBarcode() },
+            )
+        }
+        composable(Routes.REPORTS) {
+            ReportsScreen(state)
+        }
+        composable(Routes.CASH) {
+            CashScreen(
+                state = state,
+                onAddMovement = { income, concept, amount ->
+                    viewModel.addCashMovement(income, concept, amount)
+                },
+            )
+        }
+        composable(Routes.KARDEX) {
+            KardexScreen(state)
+        }
+        composable(Routes.MORE) {
+            MoreScreen(
+                state = state,
+                onNavigate = { route ->
+                    navController.navigate(route) { launchSingleTop = true }
+                },
+            )
+        }
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
+                state = state,
+                onSave = { settings -> viewModel.updateSettings(settings) },
+            )
+        }
+    }
+}
 
+/** Ticket summary shown right after a sale is confirmed. */
 @Composable
-fun Alert(n: String, d: String) { Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = CARD)) { Row(Modifier.padding(14.dp)) { Text("⚠", color = RED, fontSize = 22.sp); Spacer(Modifier.width(12.dp)); Column { Text(n, fontWeight = FontWeight.Bold); Text(d, color = SOFT, fontSize = 12.sp) } } } }
-
-@Composable
-fun Inventory(p: List<Product>, scan: () -> Unit) { Column(Modifier.padding(16.dp)) { Text("Inventario", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold); Text("${p.size} productos registrados", color = SOFT); Spacer(Modifier.height(10.dp)); Button(onClick = scan, modifier = Modifier.fillMaxWidth()) { Text("📷  ESCANEAR CÓDIGO DE BARRAS") }; LazyColumn { items(p) { x -> ListItem(headlineContent = { Text(x.name, fontWeight = FontWeight.Bold) }, supportingContent = { Text("Código ${x.barcode}") }, trailingContent = { Text("Stock ${x.stock}", color = if (x.stock <= x.min) RED else GREEN) }) } } } }
-
-@Composable
-fun Sales(p: List<Product>, c: List<Line>, add: (Product) -> Unit, checkout: () -> Unit) { val total = c.sumOf { it.p.sell * it.qty }; Column(Modifier.padding(16.dp)) { Text("Nueva venta", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold); Text("Escanea o selecciona productos", color = SOFT); LazyColumn(Modifier.weight(1f)) { items(p.filter { it.stock > 0 }) { x -> ListItem(modifier = Modifier.clickable { add(x) }, headlineContent = { Text(x.name) }, supportingContent = { Text("Stock ${x.stock}") }, trailingContent = { Text("C$ %.2f".format(x.sell)) }) } }; Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF171E34))) { Column(Modifier.padding(15.dp)) { Text("Total C$ %.2f".format(total), fontSize = 26.sp, fontWeight = FontWeight.Bold); Button(onClick = checkout, enabled = c.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Cobrar →") } } } } }
-
-@Composable
-fun Purchase(scan: () -> Unit) { Column(Modifier.padding(16.dp)) { Text("Nueva compra", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold); Text("El código de barras controla la entrada", color = SOFT); Spacer(Modifier.height(12.dp)); Button(onClick = scan, modifier = Modifier.fillMaxWidth().height(55.dp)) { Text("📷  ESCANEAR PRODUCTO") }; Spacer(Modifier.height(12.dp)); Card(colors = CardDefaults.cardColors(containerColor = CARD)) { Column(Modifier.padding(18.dp)) { Text("FLUJO AUTOMÁTICO", fontWeight = FontWeight.Bold); Text("① Escanear código\n② Buscar producto existente\n③ Cada lectura suma +1\n④ Confirmar compra\n⑤ Sumar stock + registrar Kardex", lineHeight = 26.sp); Text("No se crean duplicados por el mismo código.", color = GREEN) } } } }
-
-@Composable
-fun Scanner(p: List<Product>, close: () -> Unit) { AlertDialog(onDismissRequest = close, title = { Text("Escáner de código de barras") }, text = { Column { Box(Modifier.fillMaxWidth().height(180.dp).background(Color.Black, RoundedCornerShape(18.dp))) { Text("▣\n\nAPUNTA AL CÓDIGO", Modifier.padding(55.dp), color = Color.White) }; Spacer(Modifier.height(10.dp)); Text("Cámara preparada para CameraX + ML Kit.", color = SOFT); p.take(5).forEach { Text("▣ ${it.barcode}  ${it.name}", Modifier.padding(7.dp)) } } }, confirmButton = { TextButton(onClick = close) { Text("Cerrar") } }) }
-
-@Composable
-fun Checkout(c: List<Line>, finish: () -> Unit) { val total = c.sumOf { it.p.sell * it.qty }; Column(Modifier.padding(16.dp)) { Text("Cobro", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold); Text("C$ %.2f".format(total), fontSize = 35.sp, fontWeight = FontWeight.Bold); Text("Efectivo   Tarjeta   Transferencia", color = SOFT); Button(onClick = finish, modifier = Modifier.fillMaxWidth().padding(top = 18.dp)) { Text("Finalizar venta") } } }
-
-@Composable
-fun Simple(t: String, l: List<String>, i: String) { LazyColumn(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) { item { Text(t, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold); Text("Gestión del negocio", color = SOFT) }; items(l) { Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = CARD)) { Row(Modifier.padding(17.dp)) { Text(i); Spacer(Modifier.width(12.dp)); Text(it) } } } } }
+private fun ReceiptDialog(ticket: Sale, symbol: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Venta #${ticket.id} registrada", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                Modifier
+                    .heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Text(Dates.dateTime(ticket.dateMillis), color = Soft, fontSize = 12.sp)
+                Spacer(Modifier.height(10.dp))
+                ticket.lines.forEach { line ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp),
+                    ) {
+                        Text(
+                            "${line.qty} × ${line.name}",
+                            modifier = Modifier.weight(1f),
+                            fontSize = 13.sp,
+                        )
+                        Text(Fmt.money(line.subtotal, symbol), fontSize = 13.sp)
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                KeyValueRow("Artículos", ticket.itemCount.toString())
+                Spacer(Modifier.height(4.dp))
+                KeyValueRow("Método de pago", ticket.paymentMethod.label)
+                Spacer(Modifier.height(4.dp))
+                KeyValueRow(
+                    label = "Total",
+                    value = Fmt.money(ticket.total, symbol),
+                    valueColor = Green,
+                    emphasis = true,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Listo") } },
+    )
+}
