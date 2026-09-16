@@ -39,6 +39,12 @@ class InventoryLogicTest {
     }
 
     @Test
+    fun purchaseRejectsInvalidQuantityAndCost() {
+        assertTrue(Inventory.addToPurchase(emptyList(), notebook, 0, 40.0).isEmpty())
+        assertTrue(Inventory.addToPurchase(emptyList(), notebook, 2, -1.0).isEmpty())
+    }
+
+    @Test
     fun purchaseAddsToTheExistingStock() {
         val receipt = listOf(
             PurchaseLine(notebook.id, notebook.name, notebook.barcode, 40.0, 5),
@@ -76,6 +82,14 @@ class InventoryLogicTest {
 
         assertEquals(notebook.stock, Cart.quantityOf(cart, notebook.id))
         assertEquals(notebook.stock, Cart.itemCount(cart))
+    }
+
+    @Test
+    fun cartIgnoresNonPositiveAdditions() {
+        val cart = Cart.add(emptyList(), notebook, 2)
+        val unchanged = Cart.add(cart, notebook, -5)
+
+        assertEquals(cart, unchanged)
     }
 
     @Test
@@ -146,6 +160,11 @@ class InventoryLogicTest {
     }
 
     @Test
+    fun salesMathRanksZeroItemsWithoutThrowing() {
+        assertTrue(SalesMath.bestSellers(emptyList(), 0).isEmpty())
+    }
+
+    @Test
     fun dailyTotalsGroupsSalesPerDay() {
         val today = Dates.today()
         val sales = listOf(
@@ -158,5 +177,11 @@ class InventoryLogicTest {
         assertEquals(7, totals.size)
         assertEquals(55.0, totals.last().total, 0.001)
         assertEquals(20.0, totals[4].total, 0.001)
+    }
+
+    @Test
+    fun lastDaysRejectsNonPositiveCount() {
+        assertTrue(Dates.lastDays(0).isEmpty())
+        assertTrue(Dates.lastDays(-1).isEmpty())
     }
 }
