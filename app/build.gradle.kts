@@ -15,6 +15,17 @@ android {
         versionCode = 2
         versionName = "2.0.0"
     }
+
+    // Keep Java and Kotlin compilation on the same JVM target.
+    // This fixes: compileDebugJavaWithJavac (1.8) vs compileDebugKotlin (22).
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
