@@ -25,14 +25,14 @@ object Inventory {
     /** Stock after a sale: never goes below zero. */
     fun applySale(products: List<Product>, lines: List<SaleLine>): List<Product> =
         products.map { product ->
-            val sold = lines.filter { it.productId == product.id }.sumOf { it.qty }
+            val sold = lines.filter { it.productId == product.id }.sumOf { it.qty.coerceAtLeast(0) }
             if (sold > 0) product.copy(stock = (product.stock - sold).coerceAtLeast(0)) else product
         }
 
     /** Stock after receiving goods: every purchased line adds to the existing amount. */
     fun applyPurchase(products: List<Product>, lines: List<PurchaseLine>): List<Product> =
         products.map { product ->
-            val received = lines.filter { it.productId == product.id }.sumOf { it.qty }
+            val received = lines.filter { it.productId == product.id }.sumOf { it.qty.coerceAtLeast(0) }
             if (received > 0) product.copy(stock = product.stock + received) else product
         }
 
@@ -46,7 +46,7 @@ object Inventory {
         qty: Int = 1,
         unitCost: Double = product.buyPrice,
     ): List<PurchaseLine> {
-        if (qty <= 0) return lines
+        if (qty <= 0 || unitCost < 0) return lines
         val existing = lines.firstOrNull { it.productId == product.id }
         return if (existing == null) {
             lines + PurchaseLine(product.id, product.name, product.barcode, unitCost, qty)
@@ -63,10 +63,10 @@ object Cart {
 
     fun total(lines: List<SaleLine>): Double = lines.sumOf { it.subtotal }
 
-    fun itemCount(lines: List<SaleLine>): Int = lines.sumOf { it.qty }
+    fun itemCount(lines: List<SaleLine>): Int = lines.sumOf { it.qty.coerceAtLeast(0) }
 
     fun quantityOf(lines: List<SaleLine>, productId: Long): Int =
-        lines.firstOrNull { it.productId == productId }?.qty ?: 0
+        lines.firstOrNull { it.productId == productId }?.qty?.coerceAtLeast(0) ?: 0
 
     /**
      * Adds [qty] units of [product]. Never exceeds the available stock, and scanning
@@ -74,7 +74,7 @@ object Cart {
      */
     fun add(lines: List<SaleLine>, product: Product, qty: Int = 1): List<SaleLine> {
         val available = product.stock.coerceAtLeast(0)
-        if (available == 0) return lines
+        if (available == 0 || qty <= 0) return lines
         val current = quantityOf(lines, product.id)
         val target = (current + qty).coerceIn(1, available)
         val existing = lines.firstOrNull { it.productId == product.id }
@@ -126,7 +126,7 @@ object SalesMath {
             .groupBy { it.name }
             .map { (name, lines) -> name to lines.sumOf { it.qty } }
             .sortedByDescending { it.second }
-            .take(limit)
+            .take(limit.coerceAtLeast(0))
 
     /** Totals per day used by the dashboard chart, including days without sales. */
     fun dailyTotals(sales: List<Sale>, days: List<LocalDate>): List<DailySales> =
@@ -157,6 +157,7 @@ object Dates {
     fun today(): LocalDate = LocalDate.now(zone)
 
     fun lastDays(count: Int): List<LocalDate> {
+        if (count <= 0) return emptyList()
         val today = today()
         return (count - 1 downTo 0).map { today.minusDays(it.toLong()) }
     }
