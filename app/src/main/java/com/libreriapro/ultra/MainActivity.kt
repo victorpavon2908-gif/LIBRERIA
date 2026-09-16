@@ -18,21 +18,430 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val BG=Color(0xFF080B19);private val CARD=Color(0xFF11172A);private val PURPLE=Color(0xFF7B3FF2);private val BLUE=Color(0xFF14B8FF);private val GREEN=Color(0xFF27D17F);private val RED=Color(0xFFFF5267);private val SOFT=Color(0xFFAAB3CB)
-data class Product(val id:Int,val name:String,val barcode:String,val stock:Int,val min:Int,val buy:Double,val sell:Double)
-data class Line(val p:Product,val qty:Int)
-class MainActivity:ComponentActivity(){override fun onCreate(b:Bundle?){super.onCreate(b);setContent{App()}}}
-@Composable fun App(){var page by remember{mutableStateOf("Inicio")};var ps by remember{mutableStateOf(listOf(Product(1,"Cuaderno universitario","7501234567893",32,5,38.0,55.0),Product(2,"Lápiz HB","7509873214567",120,20,4.0,12.0),Product(3,"Colores 12 uds","7504567891234",8,10,42.0,75.0),Product(4,"Borrador blanco","7501112223334",45,10,3.0,8.0),Product(5,"Regla 30 cm","7503334445556",18,5,10.0,18.0),Product(6,"Papel bond carta","7509998887776",15,5,95.0,125.0)))};var cart by remember{mutableStateOf(listOf<Line>())};var scanner by remember{mutableStateOf(false)};MaterialTheme(colorScheme=darkColorScheme(background=BG,surface=CARD,primary=PURPLE,onSurface=Color.White)){Scaffold(containerColor=BG,topBar={Top()},bottomBar={Nav(page){page=it}}){pad->Box(Modifier.padding(pad).fillMaxSize()){when(page){"Inicio"->Home(ps){page=it};"Inventario"->Inventory(ps,{scanner=true});"Ventas"->Sales(ps,cart,{p->cart=cart.addLine(p)}){page="Cobro"};"Compras"->Purchase({scanner=true});"Reportes"->Simple("Reportes",listOf("Ingresos   C$ 24,850","Ventas   184","Compras   C$ 9,420","Stock bajo   ${ps.count{it.stock<=it.min}}"),"📊");"Cobro"->Checkout(cart){ps=ps.map{p->val q=cart.firstOrNull{it.p.id==p.id}?.qty?:0;if(q>0)p.copy(stock=(p.stock-q).coerceAtLeast(0))else p};cart=emptyList();page="Ventas"};"Caja"->Simple("Caja",listOf("Apertura de caja","Ventas del día C$ 8,450","Entradas C$ 1,200","Salidas C$ 500","Cierre"),"💵");"Kardex"->Simple("Kardex",listOf("Compra +20 → 40","Venta -3 → 37","Venta -5 → 32","Compra +15 → 47"),"▤");else->Simple("Más",listOf("Clientes","Proveedores","Usuarios y roles","Configuración"),"⚙️")}}}}};if(scanner)Scanner(ps){scanner=false}}}
-fun List<Line>.addLine(p:Product)=map{if(it.p.id==p.id)it.copy(qty=it.qty+1)else it}.let{if(it.none{a->a.p.id==p.id})it+Line(p,1)else it}
-@Composable fun Top(){Row(Modifier.fillMaxWidth().background(BG).padding(18.dp)){Text("☰",fontSize=24.sp);Spacer(Modifier.width(14.dp));Column(Modifier.weight(1f)){Text("MYC",fontSize=21.sp,fontWeight=FontWeight.ExtraBold);Text("LIBRERÍA",fontSize=9.sp,color=SOFT,letterSpacing=2.sp)};Text("⌕  🔔  ●")}}
-@Composable fun Nav(p:String,g:(String)->Unit){NavigationBar(containerColor=Color(0xFF0D1223)){listOf("Inicio" to "⌂","Inventario" to "▣","Ventas" to "🛒","Reportes" to "▥").forEach{(n,i)->NavigationBarItem(p==n,{g(n)},{Text(i)},label={Text(n,fontSize=10.sp)})}}}
-@Composable fun Home(p:List<Product>,g:(String)->Unit){val low=p.count{it.stock<=it.min};LazyColumn(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){item{Text("¡Hola, Víctor! 👋",fontSize=27.sp,fontWeight=FontWeight.ExtraBold);Text("Bienvenido a tu negocio",color=SOFT)};item{Card(Modifier.fillMaxWidth(),shape=RoundedCornerShape(22.dp)){Row(Modifier.background(Brush.linearGradient(listOf(PURPLE,BLUE))).padding(20.dp)){Column(Modifier.weight(1f)){Text("Ventas hoy",color=Color.White.copy(.8f));Text("C$ 8,450",fontSize=30.sp,fontWeight=FontWeight.ExtraBold);Text("↑ 12%")};Text("▥",fontSize=30.sp)}}};item{Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){Metric("▣","Productos",p.size.toString(),Modifier.weight(1f));Metric("⚠","Stock bajo",low.toString(),Modifier.weight(1f))}};item{Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){Metric("📦","Compras","C$ 3,200",Modifier.weight(1f));Metric("👥","Clientes","48",Modifier.weight(1f))}};item{Text("Acciones rápidas",fontSize=18.sp,fontWeight=FontWeight.Bold)};item{Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){Quick("📷","Escanear",BLUE){g("Inventario")};Quick("🛒","Venta",PURPLE){g("Ventas")};Quick("📦","Compra",GREEN){g("Compras")}}};item{Text("Ventas de la semana",fontSize=18.sp,fontWeight=FontWeight.Bold)};item{Text("▂▅▃▇▆█▇",fontSize=35.sp,color=PURPLE)};item{Text("⚡ Alertas",fontSize=18.sp,fontWeight=FontWeight.Bold)};items(p.filter{it.stock<=it.min}){Alert(it.name,"Solo quedan ${it.stock} unidades")}}}
-@Composable fun Metric(i:String,t:String,v:String,m:Modifier){Card(m,shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=CARD)){Column(Modifier.padding(15.dp)){Text(i,fontSize=21.sp);Text(t,color=SOFT,fontSize=12.sp);Text(v,fontSize=20.sp,fontWeight=FontWeight.Bold)}}}
-@Composable fun Quick(i:String,t:String,c:Color,on:()->Unit){Card(Modifier.weight(1f).clickable{on()},shape=RoundedCornerShape(16.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFF171E34))){Column(Modifier.padding(12.dp)){Text(i,fontSize=22.sp);Text(t,color=c,fontSize=11.sp)}}}
-@Composable fun Alert(n:String,d:String){Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=CARD)){Row(Modifier.padding(14.dp)){Text("⚠",color=RED,fontSize=22.sp);Spacer(Modifier.width(12.dp));Column{Text(n,fontWeight=FontWeight.Bold);Text(d,color=SOFT,fontSize=12.sp)}}}}
-@Composable fun Inventory(p:List<Product>,scan:()->Unit){Column(Modifier.padding(16.dp)){Text("Inventario",fontSize=27.sp,fontWeight=FontWeight.ExtraBold);Text("${p.size} productos registrados",color=SOFT);Spacer(Modifier.height(10.dp));Button(scan,Modifier.fillMaxWidth()){Text("📷  ESCANEAR CÓDIGO DE BARRAS")};LazyColumn{items(p){x->ListItem(headlineContent={Text(x.name,fontWeight=FontWeight.Bold)},supportingContent={Text("Código ${x.barcode}")},trailingContent={Text("Stock ${x.stock}",color=if(x.stock<=x.min)RED else GREEN)})}}}}
-@Composable fun Sales(p:List<Product>,c:List<Line>,add:(Product)->Unit,checkout:()->Unit){val t=c.sumOf{it.p.sell*it.qty};Column(Modifier.padding(16.dp)){Text("Nueva venta",fontSize=27.sp,fontWeight=FontWeight.ExtraBold);Text("Escanea o selecciona productos",color=SOFT);LazyColumn(Modifier.weight(1f)){items(p.filter{it.stock>0}){x->ListItem(Modifier.clickable{add(x)},headlineContent={Text(x.name)},supportingContent={Text("Stock ${x.stock}")},trailingContent={Text("C$ %.2f".format(x.sell))})}};Card(colors=CardDefaults.cardColors(containerColor=Color(0xFF171E34))){Column(Modifier.padding(15.dp)){Text("Total C$ %.2f".format(t),fontSize=26.sp,fontWeight=FontWeight.Bold);Button(checkout,enabled=c.isNotEmpty(),Modifier.fillMaxWidth()){Text("Cobrar →")}}}}}
-@Composable fun Purchase(scan:()->Unit){Column(Modifier.padding(16.dp)){Text("Nueva compra",fontSize=27.sp,fontWeight=FontWeight.ExtraBold);Text("El código de barras controla la entrada",color=SOFT);Spacer(Modifier.height(12.dp));Button(scan,Modifier.fillMaxWidth().height(55.dp)){Text("📷  ESCANEAR PRODUCTO")};Spacer(Modifier.height(12.dp));Card(colors=CardDefaults.cardColors(containerColor=CARD)){Column(Modifier.padding(18.dp)){Text("FLUJO AUTOMÁTICO",fontWeight=FontWeight.Bold);Text("① Escanear código\n② Buscar producto existente\n③ Cada lectura suma +1\n④ Confirmar compra\n⑤ Sumar stock + registrar Kardex",lineHeight=26.sp);Text("No se crean duplicados por el mismo código.",color=GREEN)}}}}
-@Composable fun Scanner(p:List<Product>,close:()->Unit){AlertDialog(onDismissRequest=close,title={Text("Escáner de código de barras")},text={Column{Box(Modifier.fillMaxWidth().height(180.dp).background(Color.Black,RoundedCornerShape(18.dp))){Text("▣\n\nAPUNTA AL CÓDIGO",Modifier.padding(55.dp),color=Color.White)}Spacer(Modifier.height(10.dp));Text("Cámara preparada para CameraX + ML Kit.",color=SOFT);p.take(5).forEach{Text("▣ ${it.barcode}  ${it.name}",Modifier.padding(7.dp))}},confirmButton={TextButton(close){Text("Cerrar")}})}
-@Composable fun Checkout(c:List<Line>,finish:()->Unit){val t=c.sumOf{it.p.sell*it.qty};Column(Modifier.padding(16.dp)){Text("Cobro",fontSize=27.sp,fontWeight=FontWeight.ExtraBold);Text("C$ %.2f".format(t),fontSize=35.sp,fontWeight=FontWeight.Bold);Text("Efectivo   Tarjeta   Transferencia",color=SOFT);Button(finish,Modifier.fillMaxWidth().padding(top=18.dp)){Text("Finalizar venta")}}}
-@Composable fun Simple(t:String,l:List<String>,i:String){LazyColumn(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){item{Text(t,fontSize=27.sp,fontWeight=FontWeight.ExtraBold);Text("Gestión del negocio",color=SOFT)};items(l){Card(Modifier.fillMaxWidth(),colors=CardDefaults.cardColors(containerColor=CARD)){Row(Modifier.padding(17.dp)){Text(i);Spacer(Modifier.width(12.dp));Text(it)}}}}}
+private val BG = Color(0xFF080B19)
+private val CARD = Color(0xFF11172A)
+private val PURPLE = Color(0xFF7B3FF2)
+private val BLUE = Color(0xFF14B8FF)
+private val GREEN = Color(0xFF27D17F)
+private val RED = Color(0xFFFF5267)
+private val SOFT = Color(0xFFAAB3CB)
+
+data class Product(
+    val id: Int,
+    val name: String,
+    val barcode: String,
+    val stock: Int,
+    val min: Int,
+    val buy: Double,
+    val sell: Double
+)
+
+data class Line(val p: Product, val qty: Int)
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(b: Bundle?) {
+        super.onCreate(b)
+        setContent { App() }
+    }
+}
+
+@Composable
+fun App() {
+    var page by remember { mutableStateOf("Inicio") }
+    var ps by remember {
+        mutableStateOf(
+            listOf(
+                Product(1, "Cuaderno universitario", "7501234567893", 32, 5, 38.0, 55.0),
+                Product(2, "Lápiz HB", "7509873214567", 120, 20, 4.0, 12.0),
+                Product(3, "Colores 12 uds", "7504567891234", 8, 10, 42.0, 75.0),
+                Product(4, "Borrador blanco", "7501112223334", 45, 10, 3.0, 8.0),
+                Product(5, "Regla 30 cm", "7503334445556", 18, 5, 10.0, 18.0),
+                Product(6, "Papel bond carta", "7509998887776", 15, 5, 95.0, 125.0)
+            )
+        )
+    }
+    var cart by remember { mutableStateOf(listOf<Line>()) }
+    var scanner by remember { mutableStateOf(false) }
+
+    MaterialTheme(
+        colorScheme = darkColorScheme(
+            background = BG,
+            surface = CARD,
+            primary = PURPLE,
+            onSurface = Color.White
+        )
+    ) {
+        Scaffold(
+            containerColor = BG,
+            topBar = { Top() },
+            bottomBar = { Nav(page) { page = it } }
+        ) { pad ->
+            Box(Modifier.padding(pad).fillMaxSize()) {
+                when (page) {
+                    "Inicio" -> Home(ps) { page = it }
+                    "Inventario" -> Inventory(ps) { scanner = true }
+                    "Ventas" -> Sales(
+                        ps,
+                        cart,
+                        { product -> cart = cart.addLine(product) }
+                    ) { page = "Cobro" }
+                    "Compras" -> Purchase { scanner = true }
+                    "Reportes" -> Simple(
+                        "Reportes",
+                        listOf(
+                            "Ingresos   C$ 24,850",
+                            "Ventas   184",
+                            "Compras   C$ 9,420",
+                            "Stock bajo   ${ps.count { it.stock <= it.min }}"
+                        ),
+                        "📊"
+                    )
+                    "Cobro" -> Checkout(cart) {
+                        ps = ps.map { product ->
+                            val qty = cart.firstOrNull { it.p.id == product.id }?.qty ?: 0
+                            if (qty > 0) {
+                                product.copy(stock = (product.stock - qty).coerceAtLeast(0))
+                            } else {
+                                product
+                            }
+                        }
+                        cart = emptyList()
+                        page = "Ventas"
+                    }
+                    "Caja" -> Simple(
+                        "Caja",
+                        listOf(
+                            "Apertura de caja",
+                            "Ventas del día C$ 8,450",
+                            "Entradas C$ 1,200",
+                            "Salidas C$ 500",
+                            "Cierre"
+                        ),
+                        "💵"
+                    )
+                    "Kardex" -> Simple(
+                        "Kardex",
+                        listOf(
+                            "Compra +20 → 40",
+                            "Venta -3 → 37",
+                            "Venta -5 → 32",
+                            "Compra +15 → 47"
+                        ),
+                        "▤"
+                    )
+                    else -> Simple(
+                        "Más",
+                        listOf(
+                            "Clientes",
+                            "Proveedores",
+                            "Usuarios y roles",
+                            "Configuración"
+                        ),
+                        "⚙️"
+                    )
+                }
+            }
+        }
+
+        if (scanner) {
+            Scanner(ps) { scanner = false }
+        }
+    }
+}
+
+fun List<Line>.addLine(p: Product): List<Line> =
+    map {
+        if (it.p.id == p.id) it.copy(qty = it.qty + 1) else it
+    }.let { updated ->
+        if (updated.none { it.p.id == p.id }) updated + Line(p, 1) else updated
+    }
+
+@Composable
+fun Top() {
+    Row(
+        Modifier.fillMaxWidth().background(BG).padding(18.dp)
+    ) {
+        Text("☰", fontSize = 24.sp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text("MYC", fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+            Text("LIBRERÍA", fontSize = 9.sp, color = SOFT, letterSpacing = 2.sp)
+        }
+        Text("⌕  🔔  ●")
+    }
+}
+
+@Composable
+fun Nav(p: String, g: (String) -> Unit) {
+    NavigationBar(containerColor = Color(0xFF0D1223)) {
+        listOf(
+            "Inicio" to "⌂",
+            "Inventario" to "▣",
+            "Ventas" to "🛒",
+            "Reportes" to "▥"
+        ).forEach { (name, icon) ->
+            NavigationBarItem(
+                selected = p == name,
+                onClick = { g(name) },
+                icon = { Text(icon) },
+                label = { Text(name, fontSize = 10.sp) }
+            )
+        }
+    }
+}
+
+@Composable
+fun Home(p: List<Product>, g: (String) -> Unit) {
+    val low = p.count { it.stock <= it.min }
+    LazyColumn(
+        Modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Text("¡Hola, Víctor! 👋", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Bienvenido a tu negocio", color = SOFT)
+        }
+        item {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
+                Row(
+                    Modifier.background(
+                        Brush.linearGradient(listOf(PURPLE, BLUE))
+                    ).padding(20.dp)
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Ventas hoy", color = Color.White.copy(alpha = .8f))
+                        Text("C$ 8,450", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("↑ 12%")
+                    }
+                    Text("▥", fontSize = 30.sp)
+                }
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Metric("▣", "Productos", p.size.toString(), Modifier.weight(1f))
+                Metric("⚠", "Stock bajo", low.toString(), Modifier.weight(1f))
+            }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Metric("📦", "Compras", "C$ 3,200", Modifier.weight(1f))
+                Metric("👥", "Clientes", "48", Modifier.weight(1f))
+            }
+        }
+        item { Text("Acciones rápidas", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Quick("📷", "Escanear", BLUE) { g("Inventario") }
+                Quick("🛒", "Venta", PURPLE) { g("Ventas") }
+                Quick("📦", "Compra", GREEN) { g("Compras") }
+            }
+        }
+        item { Text("Ventas de la semana", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+        item { Text("▂▅▃▇▆█▇", fontSize = 35.sp, color = PURPLE) }
+        item { Text("⚡ Alertas", fontSize = 18.sp, fontWeight = FontWeight.Bold) }
+        items(p.filter { it.stock <= it.min }) {
+            Alert(it.name, "Solo quedan ${it.stock} unidades")
+        }
+    }
+}
+
+@Composable
+fun Metric(i: String, t: String, v: String, m: Modifier) {
+    Card(
+        m,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = CARD)
+    ) {
+        Column(Modifier.padding(15.dp)) {
+            Text(i, fontSize = 21.sp)
+            Text(t, color = SOFT, fontSize = 12.sp)
+            Text(v, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun Quick(i: String, t: String, c: Color, on: () -> Unit) {
+    Card(
+        Modifier.weight(1f).clickable { on() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF171E34))
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text(i, fontSize = 22.sp)
+            Text(t, color = c, fontSize = 11.sp)
+        }
+    }
+}
+
+@Composable
+fun Alert(n: String, d: String) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = CARD)
+    ) {
+        Row(Modifier.padding(14.dp)) {
+            Text("⚠", color = RED, fontSize = 22.sp)
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(n, fontWeight = FontWeight.Bold)
+                Text(d, color = SOFT, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun Inventory(p: List<Product>, scan: () -> Unit) {
+    Column(Modifier.padding(16.dp)) {
+        Text("Inventario", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+        Text("${p.size} productos registrados", color = SOFT)
+        Spacer(Modifier.height(10.dp))
+        Button(scan, Modifier.fillMaxWidth()) {
+            Text("📷  ESCANEAR CÓDIGO DE BARRAS")
+        }
+        LazyColumn {
+            items(p) { x ->
+                ListItem(
+                    headlineContent = { Text(x.name, fontWeight = FontWeight.Bold) },
+                    supportingContent = { Text("Código ${x.barcode}") },
+                    trailingContent = {
+                        Text(
+                            "Stock ${x.stock}",
+                            color = if (x.stock <= x.min) RED else GREEN
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun Sales(
+    p: List<Product>,
+    c: List<Line>,
+    add: (Product) -> Unit,
+    checkout: () -> Unit
+) {
+    val total = c.sumOf { it.p.sell * it.qty }
+    Column(Modifier.padding(16.dp)) {
+        Text("Nueva venta", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Escanea o selecciona productos", color = SOFT)
+        LazyColumn(Modifier.weight(1f)) {
+            items(p.filter { it.stock > 0 }) { x ->
+                ListItem(
+                    Modifier.clickable { add(x) },
+                    headlineContent = { Text(x.name) },
+                    supportingContent = { Text("Stock ${x.stock}") },
+                    trailingContent = { Text("C$ %.2f".format(x.sell)) }
+                )
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF171E34))) {
+            Column(Modifier.padding(15.dp)) {
+                Text("Total C$ %.2f".format(total), fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                Button(
+                    checkout,
+                    enabled = c.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Cobrar →") }
+            }
+        }
+    }
+}
+
+@Composable
+fun Purchase(scan: () -> Unit) {
+    Column(Modifier.padding(16.dp)) {
+        Text("Nueva compra", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+        Text("El código de barras controla la entrada", color = SOFT)
+        Spacer(Modifier.height(12.dp))
+        Button(scan, Modifier.fillMaxWidth().height(55.dp)) {
+            Text("📷  ESCANEAR PRODUCTO")
+        }
+        Spacer(Modifier.height(12.dp))
+        Card(colors = CardDefaults.cardColors(containerColor = CARD)) {
+            Column(Modifier.padding(18.dp)) {
+                Text("FLUJO AUTOMÁTICO", fontWeight = FontWeight.Bold)
+                Text(
+                    "① Escanear código\n② Buscar producto existente\n③ Cada lectura suma +1\n④ Confirmar compra\n⑤ Sumar stock + registrar Kardex",
+                    lineHeight = 26.sp
+                )
+                Text("No se crean duplicados por el mismo código.", color = GREEN)
+            }
+        }
+    }
+}
+
+@Composable
+fun Scanner(p: List<Product>, close: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Escáner de código de barras") },
+        text = {
+            Column {
+                Box(
+                    Modifier.fillMaxWidth().height(180.dp).background(
+                        Color.Black,
+                        RoundedCornerShape(18.dp)
+                    )
+                ) {
+                    Text(
+                        "▣\n\nAPUNTA AL CÓDIGO",
+                        Modifier.padding(55.dp),
+                        color = Color.White
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Text("Cámara preparada para CameraX + ML Kit.", color = SOFT)
+                p.take(5).forEach {
+                    Text("▣ ${it.barcode}  ${it.name}", Modifier.padding(7.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(close) { Text("Cerrar") }
+        }
+    )
+}
+
+@Composable
+fun Checkout(c: List<Line>, finish: () -> Unit) {
+    val total = c.sumOf { it.p.sell * it.qty }
+    Column(Modifier.padding(16.dp)) {
+        Text("Cobro", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+        Text("C$ %.2f".format(total), fontSize = 35.sp, fontWeight = FontWeight.Bold)
+        Text("Efectivo   Tarjeta   Transferencia", color = SOFT)
+        Button(
+            finish,
+            Modifier.fillMaxWidth().padding(top = 18.dp)
+        ) { Text("Finalizar venta") }
+    }
+}
+
+@Composable
+fun Simple(t: String, l: List<String>, i: String) {
+    LazyColumn(
+        Modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        item {
+            Text(t, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+            Text("Gestión del negocio", color = SOFT)
+        }
+        items(l) {
+            Card(
+                Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = CARD)
+            ) {
+                Row(Modifier.padding(17.dp)) {
+                    Text(i)
+                    Spacer(Modifier.width(12.dp))
+                    Text(it)
+                }
+            }
+        }
+    }
+}
